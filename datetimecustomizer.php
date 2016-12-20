@@ -12,6 +12,9 @@ if (!defined('_CAN_LOAD_FILES_'))
 class DateTimeCustomizer extends Module
 {
 	private $_html = '';
+	private $order;
+	private $delivery_date;
+	private $delivery_time;
 
 	public function __construct()
 	{
@@ -38,7 +41,11 @@ class DateTimeCustomizer extends Module
 			|| !$this->registerHook('beforeCarrier')
 			|| !$this->registerHook('orderDetailDisplayed')
 			|| !$this->registerHook('actionCarrierUpdate')
-			|| !$this->registerHook('displayPDFInvoice'))
+			|| !$this->registerHook('displayPDFInvoice')
+			|| !$this->registerHook('displayPaymentTop')
+			|| !$this->registerHook('orderConfirmation')
+			|| !$this->registerHook('displayAdminOrder')
+			|| !$this->registerHook('header'))
 				return false;
 
 			// This table stores the carrier rules or the time slots
@@ -56,6 +63,7 @@ class DateTimeCustomizer extends Module
 		CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'datetimecustomizer_order_detail` (
 			`id_order_detail` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			`id_order` INT NOT NULL,
+			`id_cart` INT NOT NULL,
 			`minimal_time` VARCHAR(20) NOT NULL,
 			`maximal_time` VARCHAR(20) NOT NULL,
 			`delivery_date` VARCHAR(20) NOT NULL
@@ -358,9 +366,7 @@ class DateTimeCustomizer extends Module
 
 		foreach ($list as $key => $val)
 		{
-			if (!$val['name'])
-				$list[$key]['name'] = Configuration::get('PS_SHOP_NAME');
-
+			$list[$key]['name'] = Configuration::get('PS_SHOP_NAME');
 			//Convert 24hour to 12 hour here and then display
 			$val['minimal_time'] = $this->_getTwelveHourTime($val['minimal_time']);
 			$val['maximal_time'] = $this->_getTwelveHourTime($val['maximal_time']);
@@ -507,6 +513,10 @@ class DateTimeCustomizer extends Module
 			'rules' => $results,
 			'serverdate' => date('d/m/Y'),
 			'maxDate' => $max_order_date,
+			'datenotset' => Tools::getValue('datenotset'),
+			'timenotset' => Tools::getValue('timenotset'),
+			'dateval' => $this->context->cookie->delivery_date,
+			'timeval' => $this->context->cookie->delivery_time,
 			'timeicon' => $this->_path."assets/time.png"
 		));	
 		return $this->display(__FILE__, 'beforeCarrier.tpl');
@@ -514,10 +524,144 @@ class DateTimeCustomizer extends Module
 	}
 
 
-	public function hookActionCarrierProcess($params)
+	public function hookActionBeforePayment($params)
 	{
+		if ( Tools::getValue('delivery_date') ) {
+            
+            if (!Validate::isDate(Tools::getValue('delivery_date'))) {
+                $this->errors[] = Tools::displayError('Invalid date.');
+            }
+            else{
+	        	$this->errors[] = Tools::displayError('Correct');
+	        }
 
+        }else{
+        	$this->errors[] = Tools::displayError('Not checking delivery date.');
+        }
 	}
 
+	public function hookHeader($params)
+	{
+		$this->context->controller->addJqueryUi('ui.datepicker');
+
+		if(Tools::getValue('step') == 1){
+			$this->context->cookie->__unset('delivery_date');
+			$this->context->cookie->__unset('delivery_time');
+		}
+
+		if(Tools::getValue('step') == 3)
+		{
+			if( !Tools::getValue('delivery_date'))
+			{
+				Tools::redirect('index.php?controller=order&step=2&datenotset=1&timenotset=1');
+			}
+			else
+			{
+				$this->delivery_date = Tools::getValue('delivery_date');
+				$this->delivery_time = Tools::getValue('delivery_time');
+				$this->context->cookie->__set('delivery_date',$this->delivery_date);
+				$this->context->cookie->__set('delivery_time',$this->delivery_time);
+
+				$id_cart = $this->context->cookie->id_cart;
+
+				$time = $this->_getSanitizedTime($this->delivery_time);
+				$minimal_time = $time[0];
+				$maximal_time = $time[1];
+
+
+				$date = str_replace("/","-", $this->delivery_date);
+				$this->delivery_date = strtotime($date);
+
+				if ($this->_isAlreadyDefinedOrder($id_cart)){
+					$id_order_detail = $this->_getIdOrderDetail($id_cart);
+					$this->updateOrderValues($id_cart, $id_order_detail, $this->delivery_date, $minimal_time, $maximal_time);
+				}	
+				else{
+					$this->addOrderValues($id_cart, $this->delivery_date, $minimal_time, $maximal_time);
+				}
+			}
+		}
+	}
+			public function updateOrderValues($id_cart, $id_order_detail, $delivery_date, $minimal_time, $maximal_time){
+				Db::getInstance()->execute('
+					UPDATE `'._DB_PREFIX_.'datetimecustomizer_order_detail`
+					SET `id_cart`= '.(int)$id_cart.', `delivery_date`= '.$delivery_date.', `minimal_time` = '.pSQL($minimal_time).', `maximal_time` = '.pSQL($maximal_time).'
+					WHERE `id_order_detail` = '.(int)($id_order_detail)
+					);
+			}
+
+			public function addOrderValues($id_cart, $delivery_date, $minimal_time, $maximal_time){
+					Db::getInstance()->execute('
+						INSERT INTO `'._DB_PREFIX_.'datetimecustomizer_order_detail`(`id_cart`,`delivery_date`,`minimal_time`, `maximal_time`)
+						VALUES ('.(int)$id_cart.','.$delivery_date.','.pSQL($minimal_time).', '.pSQL($maximal_time).')
+						');
+			}
+			
+			public function _getSanitizedTime($time){
+				$list = explode("-", $time);
+
+				if($list){
+					foreach ($list as &$l) {
+						if(strpos($l, 'PM'))
+							$l = intval($l) + 12;
+						else
+							$l = intval($l);
+					}
+				}
+				return $list;
+			}
+
+			public function _isAlreadyDefinedOrder($id_cart){
+			
+				return (bool)Db::getInstance()->getValue('
+					SELECT COUNT(*) FROM `'._DB_PREFIX_.'datetimecustomizer_order_detail` WHERE `id_cart` = '.(int)$id_cart);
+			}
+
+			public function _getIdOrderDetail($id_cart){
+				return Db::getInstance()->getValue('
+					SELECT `id_order_detail` FROM `'._DB_PREFIX_.'datetimecustomizer_order_detail` WHERE `id_cart` = '.(int)$id_cart);
+			}
+
+
+	public function hookOrderConfirmation($params)
+	{
+		$id_cart = Tools::getValue('id_cart');
+		$id_order = Order::getOrderByCartId($id_cart);
+
+		$this->changeOrderId($id_cart, $id_order);
+
+		
+
+	}
+		public function changeOrderId($id_cart, $id_order)
+		{
+			Db::getInstance()->execute('
+					UPDATE `'._DB_PREFIX_.'datetimecustomizer_order_detail`
+					SET `id_order`= '.$id_order.'
+					WHERE `id_cart` = '.(int)($id_cart)
+					);
+		}
+
+
+	public function hookAdminOrder($params){
+
+		$sql = 'SELECT * FROM `'._DB_PREFIX_.'datetimecustomizer_order_detail` WHERE `id_order`='.(int)(Tools::getValue('id_order'));
+		if($result = Db::getInstance()->ExecuteS($sql))
+		{
+		        $timestamp = $result[0]['delivery_date'];
+		        $min_time = $this->_getTwelveHourTime($result[0]['minimal_time']);
+		        $max_time = $this->_getTwelveHourTime($result[0]['maximal_time']);
+		        $orderid = $result[0]['id_order'];
+		}
+		$time = $min_time.'-'.$max_time;
+		$date = date("d/m/Y", $timestamp);
+
+		$this->smarty->assign(array(
+			'deliverydate' => $date,
+			'deliverytime' => $time,
+			'orderid' => $orderid
+		));	
+		return $this->display(__FILE__, 'adminorders.tpl');
+	}
 
 }
