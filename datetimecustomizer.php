@@ -396,7 +396,7 @@ class DateTimeCustomizer extends Module
 
 		$this->context->smarty->assign(array('add_url' => $add_url));
 
-		return $this->display(__FILE__, 'button.tpl').$helper->generateList($list, $fields_list).$this->display(__FILE__, 'button.tpl');
+		return $this->display(__FILE__, 'smarty/button.tpl').$helper->generateList($list, $fields_list).$this->display(__FILE__, 'button.tpl');
 	}
 
 
@@ -519,7 +519,7 @@ class DateTimeCustomizer extends Module
 			'timeval' => $this->context->cookie->delivery_time,
 			'timeicon' => $this->_path."assets/time.png"
 		));	
-		return $this->display(__FILE__, 'beforeCarrier.tpl');
+		return $this->display(__FILE__, 'smarty/beforeCarrier.tpl');
 
 	}
 
