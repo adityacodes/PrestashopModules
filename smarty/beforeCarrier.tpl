@@ -13,7 +13,6 @@
 		<h4 style="color: red;" class="text-center"><strong>TIME NOT SET.</strong></h4>
 	{/if}
 <h5>
-
 		<div class="form-group col-sm-6">
 		  <label class="col-sm-5" for="sel1">Expected Date Of Delivery:</label>
 		  <div class="col-sm-7">
@@ -48,7 +47,8 @@
 	
 
 </div><br><br><br>
-
+<input type="text" id="servertime" value="{$servertime}" hidden>
+<input type="text" id="serverdate" value="{$serverdate}" hidden>
 
 <script>
 	$( function() {
@@ -74,7 +74,7 @@ function chooseDateTime()
 	            type: 'inline',
 	            autoScale: true,
 	            minHeight: 30,
-	            content: '<p class="fancybox-error">' + "Delivery Date and time not set." + '</p>'
+	            content: '<p class="fancybox-error">' + "Delivery date and time not set." + '</p>'
 	        }],
 			{
 		        padding: 0

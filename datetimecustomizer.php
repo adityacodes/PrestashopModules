@@ -396,7 +396,7 @@ class DateTimeCustomizer extends Module
 
 		$this->context->smarty->assign(array('add_url' => $add_url));
 
-		return $this->display(__FILE__, 'smarty/button.tpl').$helper->generateList($list, $fields_list).$this->display(__FILE__, 'button.tpl');
+		return $this->display(__FILE__, 'smarty/button.tpl').$helper->generateList($list, $fields_list).$this->display(__FILE__, 'smarty/button.tpl');
 	}
 
 
@@ -499,9 +499,10 @@ class DateTimeCustomizer extends Module
 
 	public function hookBeforeCarrier($params)
 	{
-		
+		$id_cart = $this->context->cookie->id_cart;
+		var_dump($id_cart);
 		$results = $this->_getTimesOfDelivery();
-
+		
 		foreach ($results as &$rs ) {
 			$rs['minimal_time'] = $this->_getTwelveHourTime($rs['minimal_time']);
 			$rs['maximal_time'] = $this->_getTwelveHourTime($rs['maximal_time']);
@@ -509,19 +510,45 @@ class DateTimeCustomizer extends Module
 
 		$max_order_date = Configuration::get('DTC_MAX_ORDER_DATE');
 
+		if( ((int)date('H')) > 21 ){
+			$tempdate = ((int)date('d')) + 1;
+			$serverdate = $tempdate.'/'.date('m/Y');
+		}else{
+			$serverdate = date('d/m/Y');
+		}
+
+		if($id_cart){
+			$result = $this->_getOrderDetailByCartId($id_cart);
+			if(empty($result)){
+				$dateval="";
+				$timeval="";
+			}
+			else{
+				$tempdate = date("d/m/Y", $result[0]['delivery_date']);
+				$dateval=$tempdate;
+				$timeval = $this->_getTwelveHourTime($result[0]['minimal_time']).'-'.$this->_getTwelveHourTime($result[0]['maximal_time']);
+			}
+		}
+
+
 		$this->smarty->assign(array(
 			'rules' => $results,
-			'serverdate' => date('d/m/Y'),
+			'servertime' => date('H'),
+			'serverdate' => $serverdate,
 			'maxDate' => $max_order_date,
 			'datenotset' => Tools::getValue('datenotset'),
 			'timenotset' => Tools::getValue('timenotset'),
-			'dateval' => $this->context->cookie->delivery_date,
-			'timeval' => $this->context->cookie->delivery_time,
+			'dateval' => $dateval,
+			'timeval' => $timeval,
 			'timeicon' => $this->_path."assets/time.png"
 		));	
 		return $this->display(__FILE__, 'smarty/beforeCarrier.tpl');
 
 	}
+			protected function _getOrderDetailByCartId($id_cart){
+				return Db::getInstance()->ExecuteS('
+					SELECT * FROM `'._DB_PREFIX_.'datetimecustomizer_order_detail` WHERE `id_cart` = '.(int)$id_cart);
+			}
 
 
 	public function hookActionBeforePayment($params)
@@ -544,6 +571,10 @@ class DateTimeCustomizer extends Module
 	{
 		$this->context->controller->addJqueryUi('ui.datepicker');
 
+		$this->context->controller->addJs($this->_path.'assets/timeoptimizer.js');
+
+
+
 		if(Tools::getValue('step') == 1){
 			$this->context->cookie->__unset('delivery_date');
 			$this->context->cookie->__unset('delivery_time');
@@ -551,9 +582,14 @@ class DateTimeCustomizer extends Module
 
 		if(Tools::getValue('step') == 3)
 		{
-			if( !Tools::getValue('delivery_date'))
+			$id_cart = $this->context->cookie->id_cart;
+			if( !Tools::getValue('delivery_date') )
 			{
-				Tools::redirect('index.php?controller=order&step=2&datenotset=1&timenotset=1');
+				Tools::redirect('index.php?controller=order&step=2&datenotset=1');
+			}
+			else if(!Tools::getValue('delivery_time'))
+			{
+				Tools::redirect('index.php?controller=order&step=2&timenotset=1');
 			}
 			else
 			{
@@ -661,7 +697,7 @@ class DateTimeCustomizer extends Module
 			'deliverytime' => $time,
 			'orderid' => $orderid
 		));	
-		return $this->display(__FILE__, 'adminorders.tpl');
+		return $this->display(__FILE__, 'smarty/adminorders.tpl');
 	}
 
 }
