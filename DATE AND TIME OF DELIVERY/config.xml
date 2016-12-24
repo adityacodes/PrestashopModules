@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>datetimecustomizer</name>
+	<displayName><![CDATA[Date And Time of delivery]]></displayName>
+	<version><![CDATA[1.0.0]]></version>
+	<description><![CDATA[Allows user to choose a delivery date and preffered time slot.]]></description>
+	<author><![CDATA[Aditya]]></author>
+	<tab><![CDATA[shipping_logistics]]></tab>
+	<confirmUninstall><![CDATA[Are you sure you want to uninstall Time Customizer from your Prestashop?]]></confirmUninstall>
+	<is_configurable>1</is_configurable>
+	<need_instance>1</need_instance>
+	<limited_countries></limited_countries>
+</module>
