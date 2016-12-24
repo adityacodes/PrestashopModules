@@ -525,6 +525,7 @@ class DateTimeCustomizer extends Module
 			'maxDate' => $max_order_date,
 			'datenotset' => Tools::getValue('datenotset'),
 			'timenotset' => Tools::getValue('timenotset'),
+			'updatedetails' => Tools::getValue('updatedetails'),
 			'timeicon' => $this->_path."assets/time.png"
 		));	
 		return $this->display(__FILE__, 'smarty/beforeCarrier.tpl');

@@ -72,7 +72,7 @@ $( function(){
 
 function chooseDateTime()
 {
-	if( $('#datepicker').val().length === 0 )
+	if( $('#datepicker').val().length === 0 || $('#delivery_time :selected').val().length == 0)
 	{
 		if (!!$.prototype.fancybox)
 		    $.fancybox.open([
